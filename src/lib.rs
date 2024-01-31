@@ -7,14 +7,14 @@ use near_sdk::{
     AccountId, BorshStorageKey, PublicKey, require
 };
 
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug)]
 pub struct Manifest {
     pub version: String,
     pub cid: String,
     pub content_type: String
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Clone)]
+#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Clone, Debug)]
 #[serde(crate = "near_sdk::serde")]
 pub struct Attestation {
     pub pubkey: PublicKey,
@@ -103,13 +103,17 @@ impl Contract {
             );
 
             log_str(&format!("Creating storage..."));
+            let mut manifests = self.packages.get(&near_sdk::env::signer_account_id()).unwrap();
+            manifests.insert(&package_name, &mut Vec::new());
         }
 
         log_str(&format!("Writing manifest for {package_name}..."));
-        let manifests = self.packages.get(&near_sdk::env::signer_account_id()).unwrap();
-        manifests.get(&package_name)
-            .unwrap()
-            .push(manifest);
+        let mut manifests = self.packages.get(&near_sdk::env::signer_account_id()).unwrap();
+        let mut versions = manifests.get(&package_name)
+            .unwrap();
+
+        versions.push(manifest);
+        manifests.insert(&package_name, &versions);
     }
 
     pub fn get_latest_manifest(
@@ -153,15 +157,22 @@ impl Contract {
         content_type: String,
         cid: String
     ) {
-        let manifests = self.safe_package_retrieval(near_sdk::env::signer_account_id());
+        let mut manifests = self.safe_package_retrieval(near_sdk::env::signer_account_id());
+        let versions = manifests.get(&package_name).unwrap().clone();
 
         log_str(&format!("Updating existing manifest for {package_name} and {version}..."));
-        for mut m in manifests.get(&package_name).unwrap() {
-            if m.version == version {
-                m.cid = cid.clone();
-                m.content_type = content_type.clone();
+
+        let v = versions.clone().into_iter().map(|mut m| {
+                if m.version == version {
+                    m.cid = cid.clone();
+                    m.content_type = content_type.clone();
+                }
+
+                return m;
             }
-        }
+        ).collect::<Vec<Manifest>>();
+
+        manifests.insert(&package_name, &v);
     }
 
     pub fn create_attestation(
@@ -176,11 +187,17 @@ impl Contract {
             cid
         };
 
+        let hash = Self::generate_key(author.clone(), package_name.clone());
+
         if !self.attestations.contains_key(&near_sdk::env::signer_account_id()) {
             self.attestations.insert(
                 &near_sdk::env::signer_account_id(),
                 &LookupMap::new(PrefixKeys::Attestation)
             );
+
+            log_str(&format!("Creating attestation storage..."));
+            let mut at = self.attestations.get(&near_sdk::env::signer_account_id()).unwrap();
+            at.insert(&hash, &mut Vec::new());
         }
 
         let mut user_atts = self.safe_attestation_retrieval(
@@ -191,6 +208,8 @@ impl Contract {
         );
 
         user_atts.push(attest);
+        let mut at = self.attestations.get(&near_sdk::env::signer_account_id()).unwrap();
+        at.insert(&hash, &user_atts);
     }
 
     pub fn get_attestations(
@@ -222,17 +241,99 @@ impl Contract {
     }
 }
 
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
+    use near_sdk::test_utils::VMContextBuilder;
+    use near_sdk::{testing_env, VMContext};
 
-    #[test]
-    fn getters() {
+    fn get_context(is_view: bool) -> VMContext {
+        VMContextBuilder::new()
+            .signer_account_id("bob_near".parse().unwrap())
+            .is_view(is_view)
+            .build()
     }
 
     #[test]
-    fn setters() {
+    fn set_package_manifest() {
+        let context = get_context(false);
+        testing_env!(context.clone());
+        let cid = "QmPK1s3pNYLi9ERiq3BDxKa4XosgWwFRQUydHUtz4YgpqB".to_string();
+        let name = "test-package".to_string();
+        let version = "0.0.1".to_string();
+        let content_type = "ipfs".to_string();
+
+        let mut contract = Contract::default();
+        contract.create_manifest(
+            name.clone(),
+            version.clone(),
+            content_type.clone(),
+            cid.clone()
+        );
+        assert_eq!(
+            contract.get_manifest(context.signer_account_id.clone(), name.clone(), version.clone()),
+            cid.clone()
+        );
+    }
+
+    #[test]
+    fn update_existing_manifest() {
+        let context = get_context(false);
+        testing_env!(context.clone());
+        let cid = "QmPK1s3pNYLi9ERiq3BDxKa4XosgWwFRQUydHUtz4YgpqB".to_string();
+        let name = "test-package".to_string();
+        let version = "0.0.1".to_string();
+        let content_type = "ipfs".to_string();
+
+        let mut contract = Contract::default();
+        contract.create_manifest(
+            name.clone(),
+            version.clone(),
+            content_type.clone(),
+            cid.clone()
+        );
+
+        let new_cid = "QmdfTbBqBPQ7VNxZEYEj14VmRuZBkqFbiwReogJgS1zR1n".to_string();
+
+        contract.update_manifest(
+            name.to_string(),
+            version.to_string(),
+            "hyperfiles".to_string(),
+            new_cid.clone()
+        );
+
+        assert_eq!(
+            contract.get_manifest(context.signer_account_id.clone(), name.clone(), version.to_string()),
+            new_cid.clone()
+        );
+    }
+
+
+    #[test]
+    fn set_attestation() {
+        let context = get_context(false);
+        testing_env!(context.clone());
+        let cid = "QmPK1s3pNYLi9ERiq3BDxKa4XosgWwFRQUydHUtz4YgpqB".to_string();
+        let name = "test-package".to_string();
+        let version = "0.0.1".to_string();
+        let content_type = "ipfs".to_string();
+
+        let mut contract = Contract::default();
+        contract.create_manifest(
+            name.clone(),
+            version.clone(),
+            content_type.clone(),
+            cid.clone()
+        );
+
+
+        let attestation = "QmdfTbBqBPQ7VNxZEYEj14VmRuZBkqFbiwReogJgS1zR1n".to_string();
+
+        contract.create_attestation(name.clone(), context.signer_account_id.clone(), attestation.clone());
+
+        assert_eq!(
+            contract.get_attestation(context.signer_account_id.clone(), name.clone(), context.signer_account_id.clone(), 0).cid,
+            attestation.clone()
+        );
     }
 }
-*/
