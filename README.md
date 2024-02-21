@@ -6,11 +6,10 @@ attempt to make claims against packages *not* already in the registry will rever
 
 ## Usage
 
-:information_source: A JS library will be provided to interact with the contract, but for now, here are the NEAR CLI commands to interact with the contract.
-
-### `create_manifest`
+:information_source: A JS library will be provided to interact with the contract, but for now, here is an example NEAR CLI command.
 
 To publish a package manifest to the registry, use the following command with `near-cli-rs`, replacing with your own values:
+
 ```bash
 near contract \
     call-function \
@@ -29,21 +28,13 @@ near contract \
     send
 ```
 
-### `update_manifest`
-### `get_manifest`
-### `get_latest_manifest`
-### `create_attestation`
-### `get_attestations`
-### `get_attestation`
-
-
 ## Development
 
 ### Prerequisites
 
 - [rustup](https://rustup.rs/)
 - [cargo-near](https://github.com/near/cargo-near)
-- [near-cli-rs](https://github.com/near/near-cli-rs) OR [near-cli](https://github.com/near/near-cli) (there are a few versions for both rust & js, so your commands may vary. DYOR)
+- [near-cli-rs](https://github.com/near/near-cli-rs) OR [near-cli](https://github.com/near/near-cli)
 
 ### Build, Test and Deploy
 To build the contract you can execute the `./build.sh` script, which will in turn run:
@@ -63,8 +54,8 @@ To run unit tests seperately, execute `./test.sh`
 
 Latest version has been deployed via testnet [here](https://explorer.testnet.near.org/accounts/dev-1706709131163-75127504488588).
 
-
 If you're using `near-cli-rs`, you can deploy with this command:
+
 ```bash
 near contract deploy {{reg.archetype-test.testnet}} use-file ./target/wasm32-unknown-unknown/release/attestation_registry.wasm without-init-call network-config {{testnet}}
 ```
