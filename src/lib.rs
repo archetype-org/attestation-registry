@@ -7,6 +7,8 @@ use near_sdk::{
     AccountId, BorshStorageKey, PublicKey, require
 };
 
+
+// Represents the content being stored into the storage map
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug)]
 pub struct Manifest {
     pub version: String,
@@ -14,6 +16,7 @@ pub struct Manifest {
     pub content_type: String
 }
 
+// An attestation for a given manifest
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Clone, Debug)]
 #[serde(crate = "near_sdk::serde")]
 pub struct Attestation {
@@ -36,7 +39,9 @@ pub type Attestations = Vec<Attestation>;
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Contract {
+    // Each package in the registry is linked by a NEAR Account. Releases are then treated as a list of manifests
     pub packages: LookupMap<AccountId, Releases>,
+    // A signer can submit an attestation for a particular package already in the registry
     pub attestations: LookupMap<AccountId, LookupMap<Namespace, Attestations>>,
 }
 
@@ -58,6 +63,7 @@ impl Contract {
         }
     */
 
+    /* Helper Functions */
     fn generate_key(author: AccountId, package_name: String) -> Namespace {
         let key = author.as_str().to_owned() + package_name.as_str();
         return near_sdk::env::sha256(key.as_bytes());
@@ -83,12 +89,20 @@ impl Contract {
         return at.get(&hash).unwrap();
     }
 
+    /* Public Methods */
+
+    // Create a manifest resource for a package
     pub fn create_manifest(
         &mut self,
+        // A string representing the name of a particular package
         package_name: String,
+        // The version string that can represent either semantic versioning or any other format
         version: String,
+        // Specifies the type of content once resolved via the content id
         content_type: String,
+        // The IPFS content id that contains the package manifest
         cid: String,
+        // If a contract is calling this function the reference key can be the contract account if true or the signers account when false
         is_contract: bool,
     ) {
         let manifest = Manifest {
@@ -123,9 +137,12 @@ impl Contract {
         manifests.insert(&package_name, &versions);
     }
 
+    // Retrieves the last manifest for a particular package
     pub fn get_latest_manifest(
         &self,
+        // An account ID of the author who published the manifest
         account_id: AccountId,
+        // A string representing the name of a particular package
         package_name: String
     ) -> String {
         let manifests = self.safe_package_retrieval(account_id);
@@ -138,10 +155,15 @@ impl Contract {
             .cid.clone();
     }
 
+    // Get a single manifest file given a version and package name
+    // It will return a string saying "None" if no manifest was found
     pub fn get_manifest(
         &self,
+        // An account ID of the author who published the manifest
         account_id: AccountId,
+        // A string representing the name of a particular package
         package_name: String,
+        // The version string that is used to retreive the manifest
         version: String
     ) -> String {
         let manifests = self.safe_package_retrieval(account_id);
@@ -157,11 +179,16 @@ impl Contract {
         return "None".to_string();
     }
 
+    // Update a particular manifest file given the package name and version
     pub fn update_manifest(
         &mut self,
+        // A string representing the name of a particular package
         package_name: String,
+        // The version string that is used to retreive the manifest
         version: String,
+        // The new content type if changed
         content_type: String,
+        // The IPFS content to replace the existing one
         cid: String
     ) {
         let mut manifests = self.safe_package_retrieval(near_sdk::env::signer_account_id());
@@ -182,10 +209,14 @@ impl Contract {
         manifests.insert(&package_name, &v);
     }
 
+    // Add an attestation for a package that exists inside of the registry
     pub fn create_attestation(
         &mut self,
+        // A string representing the name of a particular package
         package_name: String,
+        // An account ID of the author who published the manifest
         author: AccountId,
+        // An IPFS content ID that contains the attestation data
         cid: String
     ) {
         let manifests = self.safe_package_retrieval(author.clone());
@@ -219,10 +250,15 @@ impl Contract {
         at.insert(&hash, &user_atts);
     }
 
+    // Retrieve all of the attestations for a given package and signer account ID
+    // Returns a list of attestation objects if they exist in the registry, otherwise reverts
     pub fn get_attestations(
         &mut self,
+        // The author of the attestation
         attestor: AccountId,
+        // The package name that the attestor has made a claim against
         package_name: String,
+        // The author for a particular package
         author: AccountId
     ) -> Attestations {
         let manifests = self.safe_package_retrieval(author.clone());
@@ -235,11 +271,18 @@ impl Contract {
         );
     }
 
+
+    // Retrieve a single attestation at a particular index
+    // Returns an attestation object if an index is known in advance
     pub fn get_attestation(
         &mut self,
+        // The author of the attestation
         attestor: AccountId,
+        // The package name that the attestor has made a claim against
         package_name: String,
+        // The author for a particular package
         author: AccountId,
+        // An index containing an attestation object
         index: usize
     ) -> Attestation {
         let at = self.get_attestations(attestor, package_name, author);
