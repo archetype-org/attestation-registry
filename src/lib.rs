@@ -88,7 +88,8 @@ impl Contract {
         package_name: String,
         version: String,
         content_type: String,
-        cid: String
+        cid: String,
+        is_contract: bool,
     ) {
         let manifest = Manifest {
             version,
@@ -96,19 +97,25 @@ impl Contract {
             cid
         };
 
-        if !self.packages.contains_key(&near_sdk::env::signer_account_id()) {
+        let mut author = near_sdk::env::signer_account_id();
+
+        if is_contract {
+            author = near_sdk::env::predecessor_account_id();
+        }
+
+        if !self.packages.contains_key(&author) {
             self.packages.insert(
-                &near_sdk::env::signer_account_id(),
+                &author,
                 &LookupMap::new(PrefixKeys::Manifest)
             );
 
             log_str(&format!("Creating storage..."));
-            let mut manifests = self.packages.get(&near_sdk::env::signer_account_id()).unwrap();
+            let mut manifests = self.packages.get(&author).unwrap();
             manifests.insert(&package_name, &mut Vec::new());
         }
 
         log_str(&format!("Writing manifest for {package_name}..."));
-        let mut manifests = self.packages.get(&near_sdk::env::signer_account_id()).unwrap();
+        let mut manifests = self.packages.get(&author).unwrap();
         let mut versions = manifests.get(&package_name)
             .unwrap();
 
@@ -268,7 +275,8 @@ mod tests {
             name.clone(),
             version.clone(),
             content_type.clone(),
-            cid.clone()
+            cid.clone(),
+            false
         );
         assert_eq!(
             contract.get_manifest(context.signer_account_id.clone(), name.clone(), version.clone()),
@@ -290,7 +298,8 @@ mod tests {
             name.clone(),
             version.clone(),
             content_type.clone(),
-            cid.clone()
+            cid.clone(),
+            false
         );
 
         let new_cid = "QmdfTbBqBPQ7VNxZEYEj14VmRuZBkqFbiwReogJgS1zR1n".to_string();
@@ -323,7 +332,8 @@ mod tests {
             name.clone(),
             version.clone(),
             content_type.clone(),
-            cid.clone()
+            cid.clone(),
+            false
         );
 
 
