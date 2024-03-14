@@ -115,6 +115,7 @@ impl Contract {
 
         if is_contract {
             author = near_sdk::env::predecessor_account_id();
+            log_str(&format!("Using contract as the author"));
         }
 
         if !self.packages.contains_key(&author) {
