@@ -1,4 +1,4 @@
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
 use near_sdk::env::log_str;
 use near_sdk::serde::{Serialize, Deserialize};
 use near_sdk::collections::LookupMap;
@@ -7,9 +7,9 @@ use near_sdk::{
     AccountId, BorshStorageKey, PublicKey, require
 };
 
-
 // Represents the content being stored into the storage map
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug)]
+#[borsh(crate = "near_sdk::borsh")]
 pub struct Manifest {
     pub version: String,
     pub cid: String,
@@ -18,6 +18,7 @@ pub struct Manifest {
 
 // An attestation for a given manifest
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Clone, Debug)]
+#[borsh(crate = "near_sdk::borsh")]
 #[serde(crate = "near_sdk::serde")]
 pub struct Attestation {
     pub pubkey: PublicKey,
@@ -25,6 +26,7 @@ pub struct Attestation {
 }
 
 #[derive(BorshDeserialize, BorshStorageKey, BorshSerialize, Copy, Clone)]
+#[borsh(crate = "near_sdk::borsh")]
 enum PrefixKeys {
     Package,
     Manifest,
@@ -38,6 +40,7 @@ pub type Attestations = Vec<Attestation>;
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
+#[borsh(crate = "near_sdk::borsh")]
 pub struct Contract {
     // Each package in the registry is linked by a NEAR Account. Releases are then treated as a list of manifests
     pub packages: LookupMap<AccountId, Releases>,
@@ -292,7 +295,7 @@ impl Contract {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
     use super::*;
     use near_sdk::test_utils::VMContextBuilder;
