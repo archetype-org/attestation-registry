@@ -126,8 +126,10 @@ impl Contract {
                 &author,
                 &LookupMap::new(PrefixKeys::Manifest)
             );
-
             log_str(&format!("Creating storage..."));
+        }
+
+        if !self.packages.get(&author).unwrap().contains_key(&package_name) {
             let mut manifests = self.packages.get(&author).unwrap();
             manifests.insert(&package_name, &mut Vec::new());
         }
@@ -327,6 +329,56 @@ mod tests {
         );
         assert_eq!(
             contract.get_manifest(context.signer_account_id.clone(), name.clone(), version.clone()),
+            cid.clone()
+        );
+    }
+
+    #[test]
+    fn set_multiple_manifest() {
+        let context = get_context(false);
+        testing_env!(context.clone());
+        let cid = "QmPK1s3pNYLi9ERiq3BDxKa4XosgWwFRQUydHUtz4YgpqB".to_string();
+        let name = "test-package".to_string();
+        let version = "0.0.1".to_string();
+        let content_type = "ipfs".to_string();
+
+        let mut contract = Contract::default();
+        contract.create_manifest(
+            name.clone(),
+            version.clone(),
+            content_type.clone(),
+            cid.clone(),
+            false
+        );
+
+        contract.create_manifest(
+            "new_package".to_string(),
+            version.clone(),
+            content_type.clone(),
+            cid.clone(),
+            false
+        );
+
+        contract.create_manifest(
+            name.clone(),
+            "0.0.2".to_string(),
+            content_type.clone(),
+            cid.clone(),
+            false
+        );
+
+        assert_eq!(
+            contract.get_manifest(context.signer_account_id.clone(), name.clone(), version.clone()),
+            cid.clone()
+        );
+
+        assert_eq!(
+            contract.get_manifest(context.signer_account_id.clone(), name.clone(), "0.0.2".to_string()),
+            cid.clone()
+        );
+
+        assert_eq!(
+            contract.get_manifest(context.signer_account_id.clone(), "new_package".to_string(), version.to_string()),
             cid.clone()
         );
     }
