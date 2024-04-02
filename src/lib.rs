@@ -376,6 +376,11 @@ mod tests {
             contract.get_manifest(context.signer_account_id.clone(), name.clone(), "0.0.2".to_string()),
             cid.clone()
         );
+
+        assert_eq!(
+            contract.get_manifest(context.signer_account_id.clone(), "new_package".to_string(), version.to_string()),
+            cid.clone()
+        );
     }
 
     #[test]
