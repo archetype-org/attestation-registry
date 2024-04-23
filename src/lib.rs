@@ -10,10 +10,12 @@ use near_sdk::{
 // Represents the content being stored into the storage map
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug)]
 #[borsh(crate = "near_sdk::borsh")]
+
 pub struct Manifest {
     pub version: String,
     pub cid: String,
-    pub content_type: String
+    pub content_type: String,
+    pub types: Vec<String>
 }
 
 // An attestation for a given manifest
@@ -30,13 +32,16 @@ pub struct Attestation {
 enum PrefixKeys {
     Package,
     Manifest,
-    Attestation
+    Attestation,
+    Types,
+    TypeList
 }
 
 pub type PackageName = String;
 pub type Namespace = Vec<u8>;
 pub type Releases = LookupMap<PackageName, Vec<Manifest>>;
 pub type Attestations = Vec<Attestation>;
+pub type Types = Vec<String>;
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -46,13 +51,17 @@ pub struct Contract {
     pub packages: LookupMap<AccountId, Releases>,
     // A signer can submit an attestation for a particular package already in the registry
     pub attestations: LookupMap<AccountId, LookupMap<Namespace, Attestations>>,
+    pub compiled_types: LookupMap<Namespace, Types>,
+    pub type_list: LookupMap<String, u8>,
 }
 
 impl Default for Contract {
     fn default() -> Self {
         Self {
             packages: LookupMap::new(PrefixKeys::Package),
-            attestations: LookupMap::new(PrefixKeys::Attestation)
+            attestations: LookupMap::new(PrefixKeys::Attestation),
+            compiled_types: LookupMap::new(PrefixKeys::Types),
+            type_list: LookupMap::new(PrefixKeys::TypeList)
         }
     }
 }
@@ -105,13 +114,16 @@ impl Contract {
         content_type: String,
         // The IPFS content id that contains the package manifest
         cid: String,
+        // A list of named types in the package
+        mut types: Vec<String>,
         // If a contract is calling this function the reference key can be the contract account if true or the signers account when false
         is_contract: bool,
     ) {
         let manifest = Manifest {
             version,
             content_type,
-            cid
+            cid,
+            types: types.clone()
         };
 
         let mut author = near_sdk::env::signer_account_id();
@@ -141,6 +153,18 @@ impl Contract {
 
         versions.push(manifest);
         manifests.insert(&package_name, &versions);
+
+        let namespace = Self::generate_key(author, package_name);
+
+        if !self.compiled_types.contains_key(&namespace) {
+            self.compiled_types.insert(&namespace, &types);
+        }
+
+        else {
+            let mut compiled_types = self.compiled_types.get(&namespace).unwrap();
+            compiled_types.append(&mut types)
+        }
+
     }
 
     // Retrieves the last manifest for a particular package
@@ -325,6 +349,7 @@ mod tests {
             version.clone(),
             content_type.clone(),
             cid.clone(),
+            Vec::new(),
             false
         );
         assert_eq!(
@@ -348,6 +373,7 @@ mod tests {
             version.clone(),
             content_type.clone(),
             cid.clone(),
+            Vec::new(),
             false
         );
 
@@ -356,6 +382,7 @@ mod tests {
             version.clone(),
             content_type.clone(),
             cid.clone(),
+            Vec::new(),
             false
         );
 
@@ -364,6 +391,7 @@ mod tests {
             "0.0.2".to_string(),
             content_type.clone(),
             cid.clone(),
+            Vec::new(),
             false
         );
 
@@ -398,6 +426,7 @@ mod tests {
             version.clone(),
             content_type.clone(),
             cid.clone(),
+            Vec::new(),
             false
         );
 
@@ -432,7 +461,8 @@ mod tests {
             version.clone(),
             content_type.clone(),
             cid.clone(),
-            false
+            Vec::new(),
+            false,
         );
 
 
