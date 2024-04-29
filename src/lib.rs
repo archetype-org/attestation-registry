@@ -1,7 +1,7 @@
 use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
 use near_sdk::env::log_str;
 use near_sdk::serde::{Serialize, Deserialize};
-use near_sdk::collections::LookupMap;
+use near_sdk::collections::{LookupMap, UnorderedMap, Vector };
 use near_sdk::near_bindgen;
 use near_sdk::{
     AccountId, BorshStorageKey, PublicKey, require
@@ -52,7 +52,7 @@ pub struct Contract {
     // A signer can submit an attestation for a particular package already in the registry
     pub attestations: LookupMap<AccountId, LookupMap<Namespace, Attestations>>,
     pub compiled_types: LookupMap<Namespace, Types>,
-    pub type_list: LookupMap<String, u8>,
+    pub type_list: UnorderedMap<String, u8>,
 }
 
 impl Default for Contract {
@@ -61,7 +61,7 @@ impl Default for Contract {
             packages: LookupMap::new(PrefixKeys::Package),
             attestations: LookupMap::new(PrefixKeys::Attestation),
             compiled_types: LookupMap::new(PrefixKeys::Types),
-            type_list: LookupMap::new(PrefixKeys::TypeList)
+            type_list: UnorderedMap::new(PrefixKeys::TypeList)
         }
     }
 }
@@ -318,6 +318,23 @@ impl Contract {
         let at = self.get_attestations(attestor, package_name, author);
 
         return at[index].clone();
+    }
+
+    pub fn attest_to_type(
+        &mut self,
+        // An account ID of the author who published the manifest
+        author: AccountId,
+        // Name of a type in a package
+        type_name: String,
+    ) {
+        if self.attestations.contains_key(&author) {
+            let count: u8 = match self.type_list.get(&type_name) {
+                Some(v) => v + 1u8,
+                None => 1u8,
+            };
+
+            self.type_list.insert(&type_name, &count);
+        }
     }
 }
 
