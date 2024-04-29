@@ -1,7 +1,7 @@
 use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
 use near_sdk::env::log_str;
 use near_sdk::serde::{Serialize, Deserialize};
-use near_sdk::collections::{LookupMap, UnorderedMap, Vector };
+use near_sdk::collections::{LookupMap, UnorderedMap};
 use near_sdk::near_bindgen;
 use near_sdk::{
     AccountId, BorshStorageKey, PublicKey, require
